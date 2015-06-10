@@ -1,6 +1,18 @@
 module RailsAdmin
   module Config
     module Actions
+      class Exception < ::Exception
+      end
+      class NoIdException < Exception
+        def initialize event
+          super I18n.t('admin.state_machine.no_id')
+        end
+      end
+      class EventDisabledException < Exception
+        def initialize event
+          super I18n.t("admin.state_machine.event_disabled", event)
+        end
+      end
       class State < Base
         RailsAdmin::Config::Actions.register(self)
 
@@ -25,21 +37,18 @@ module RailsAdmin
             end
 
             @state_machine_options = ::RailsAdminState::Configuration.new @abstract_model
-            if params['id'].present?
-              begin
-                raise 'event disabled' if @state_machine_options.disabled?(params[:event].to_sym)
-                if @object.send("fire_#{params[:attr]}_event".to_sym, params[:event].to_sym)
-                  @object.save!
-                  flash[:success] = I18n.t('admin.state_machine.event_fired', attr: params[:method], event: params[:event])
-                else
-                  flash[:error] = obj.errors.full_messages.join(', ')
-                end
-              rescue Exception => e
-                Rails.logger.error e
-                flash[:error] = I18n.t('admin.state_machine.error', err: e.to_s)
+            begin
+              raise NoIdException.new unless params['id'].present?
+              event = params[:event].to_sym
+              raise EventDisabledException.new(@object.class.human_state_event_name(event)) if @state_machine_options.disabled?(event)
+              if @object.send("fire_#{params[:attr]}_event".to_sym, params[:event].to_sym)
+                @object.save!
+                flash[:success] = I18n.t('admin.state_machine.event_fired', attr: params[:method], event: params[:event])
+              else
+                flash[:error] = @object.errors.full_messages.join(', ')
               end
-            else
-              flash[:error] = I18n.t('admin.state_machine.no_id')
+            rescue Exception => e
+              flash[:error] = e.to_s
             end
             redirect_to :back
           end

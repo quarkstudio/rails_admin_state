@@ -5,6 +5,6 @@ en:
         title: "Toggle"
     state_machine:
       event_fired: '%{attr} event %{event} fired'
-      error: "Error: %{err}"
       no_id: No ID provided
+      event_disabled: "Event '%{event}' disabled"
       no_event: Don't change
